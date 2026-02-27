@@ -2,54 +2,10 @@ package main
 
 import (
 	"fmt"
-	"io"
+	"log"
 	"net"
-	"strings"
+	"tcptohttp/internal/request"
 )
-
-func getLinesChannel(conn net.Conn) <-chan string {
-	ch := make(chan string)
-
-	go func() {
-		defer close(ch)
-		defer conn.Close()
-
-		strs := ""
-		for {
-			buffer := make([]byte, 8)
-			b, err := conn.Read(buffer)
-			if err != nil && err != io.EOF {
-				panic(err)
-			}
-
-			if err == io.EOF {
-				if strs != "" {
-					ch <- strs
-				}
-				break
-			}
-
-			if b == 0 {
-				continue
-			}
-
-			strs += string(buffer[:b])
-			for strings.Contains(strs, "\n") {
-				parts := strings.SplitN(strs, "\n", 2)
-				line := parts[0]
-				ch <- line + "\n"
-				if len(parts) == 2 {
-					strs = parts[1]
-				} else {
-					strs = ""
-				}
-			}
-		}
-
-	}()
-
-	return ch
-}
 
 func main() {
 	listener, err := net.Listen("tcp", "127.0.0.1:42069")
@@ -66,14 +22,15 @@ func main() {
 			break
 		}
 
-		fmt.Println("Connection accepted")
+		r, err := request.RequestFromReader(conn)
 
-		ch := getLinesChannel(conn)
-
-		for str := range ch {
-			fmt.Println(str)
+		if err != nil {
+			log.Fatal("error", "error", err)
 		}
 
-		fmt.Println("Connection Closed")
+		fmt.Printf("Request Line:\n")
+		fmt.Printf("- Method: %s\n", r.RequestLine.Method)
+		fmt.Printf("- Target: %s\n", r.RequestLine.RequestTarget)
+		fmt.Printf("- Version: %s\n", r.RequestLine.HttpVersion)
 	}
 }
