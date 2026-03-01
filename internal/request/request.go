@@ -3,7 +3,9 @@ package request
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"slices"
 	"tcptohttp/internal/headers"
 )
@@ -12,6 +14,7 @@ type parserState string
 const (
 	StateInit parserState = "INIT"
 	StateHeaders parserState = "HEADERS"
+	StateBody parserState = "BODY"
 	StateDone parserState = "DONE"
 	StateError parserState = "ERROR"
 )
@@ -25,7 +28,25 @@ type RequestLine struct {
 type Request struct {
 	RequestLine  RequestLine
 	Headers 	 *headers.Headers
+	Body		 string
 	state 		 parserState
+}
+
+func getInt(headers *headers.Headers, name string, defaultValue int) int {
+	value := headers.Get(name)
+	slog.Info("Getting int header", "name", name, "value", value)
+	if value == "" {
+		return defaultValue
+	}
+
+	var intValue int
+	_, err := fmt.Sscanf(value, "%d", &intValue)
+
+	if err != nil {
+		return defaultValue
+	}
+
+	return intValue
 }
 
 func newRequest() *Request {
@@ -104,6 +125,25 @@ outer:
 				read += n
 
 				if done {
+					slog.Info("Finished parsing headers", "headers", r.Headers)
+					r.state = StateBody
+				}
+			case StateBody: 
+				// If we have a Content-Length header, parse the body
+				length := getInt(r.Headers, "Content-Length", 0)
+				if length == 0 {
+					r.state = StateDone
+					break
+				}
+				remaining := min(length-len(r.Body), len(currentData))
+				if remaining == 0 {
+					break outer
+				}
+
+				r.Body += string(currentData[:remaining])
+				read += remaining
+
+				if len(r.Body) == length {
 					r.state = StateDone
 				}
 
@@ -157,6 +197,10 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			}
 			return nil, err
 		}
+	}
+
+	if !request.done() {
+		return nil, ERROR_INVALID_DATA_SIZE
 	}
 
 	return request, nil
