@@ -12,9 +12,8 @@ type Headers struct {
 
 var rn = []byte("\r\n")
 
-
 func NewHeaders() *Headers {
-	return &Headers {
+	return &Headers{
 		headers: map[string]string{},
 	}
 }
@@ -22,7 +21,7 @@ func NewHeaders() *Headers {
 func isToken(str []byte) bool {
 	for _, b := range str {
 		found := false
-		if b >= 'A' && b <= 'Z' || b >= 'a' && b <= 'z' || b >= '0' && b <= '9'|| bytes.ContainsAny([]byte("!#$%&'*+-.^_`|~"), string(b)) {
+		if b >= 'A' && b <= 'Z' || b >= 'a' && b <= 'z' || b >= '0' && b <= '9' || bytes.ContainsAny([]byte("!#$%&'*+-.^_`|~"), string(b)) {
 			found = true
 		}
 
@@ -30,7 +29,7 @@ func isToken(str []byte) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -48,10 +47,10 @@ func parseHeader(fieldLine []byte) (string, string, error) {
 		return "", "", fmt.Errorf("malformed field line: %s", string(fieldLine))
 	}
 
-	return string(name), string(value), nil	
+	return string(name), string(value), nil
 }
 
-func (h *Headers) Get(name string) (string) {
+func (h *Headers) Get(name string) string {
 	return h.headers[strings.ToLower(name)]
 }
 
@@ -77,15 +76,16 @@ func (h *Headers) Parse(data []byte) (int, bool, error) {
 	for {
 		idx := bytes.Index(data[read:], rn)
 		if idx == -1 {
-			break;
+			break
 		}
 
 		if idx == 0 {
 			done = true
-			break;
+			read += len(rn)
+			break
 		}
 
-		name, value, err := parseHeader(data[read:read+idx])
+		name, value, err := parseHeader(data[read : read+idx])
 		if err != nil {
 			return 0, false, err
 		}

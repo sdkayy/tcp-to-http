@@ -5,18 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"slices"
 	"tcptohttp/internal/headers"
 )
 
 type parserState string
+
 const (
-	StateInit parserState = "INIT"
+	StateInit    parserState = "INIT"
 	StateHeaders parserState = "HEADERS"
-	StateBody parserState = "BODY"
-	StateDone parserState = "DONE"
-	StateError parserState = "ERROR"
+	StateBody    parserState = "BODY"
+	StateDone    parserState = "DONE"
+	StateError   parserState = "ERROR"
 )
 
 type RequestLine struct {
@@ -26,15 +26,14 @@ type RequestLine struct {
 }
 
 type Request struct {
-	RequestLine  RequestLine
-	Headers 	 *headers.Headers
-	Body		 string
-	state 		 parserState
+	RequestLine RequestLine
+	Headers     *headers.Headers
+	Body        string
+	state       parserState
 }
 
 func getInt(headers *headers.Headers, name string, defaultValue int) int {
 	value := headers.Get(name)
-	slog.Info("Getting int header", "name", name, "value", value)
 	if value == "" {
 		return defaultValue
 	}
@@ -51,7 +50,7 @@ func getInt(headers *headers.Headers, name string, defaultValue int) int {
 
 func newRequest() *Request {
 	return &Request{
-		state: StateInit,
+		state:   StateInit,
 		Headers: headers.NewHeaders(),
 	}
 }
@@ -109,61 +108,61 @@ outer:
 		currentData := data[read:]
 
 		switch r.state {
-			case StateError:
-				return 0, ERROR_REQUEST_IN_ERROR_STATE
-			case StateHeaders:
-				n, done, err := r.Headers.Parse(currentData)
+		case StateError:
+			return 0, ERROR_REQUEST_IN_ERROR_STATE
+		case StateHeaders:
+			n, done, err := r.Headers.Parse(currentData)
 
-				if err != nil {
-					return 0, err
-				}
+			if err != nil {
+				return 0, err
+			}
 
-				if n == 0 {
-					break outer
-				}
-
-				read += n
-
-				if done {
-					slog.Info("Finished parsing headers", "headers", r.Headers)
-					r.state = StateBody
-				}
-			case StateBody: 
-				// If we have a Content-Length header, parse the body
-				length := getInt(r.Headers, "Content-Length", 0)
-				if length == 0 {
-					r.state = StateDone
-					break
-				}
-				remaining := min(length-len(r.Body), len(currentData))
-				if remaining == 0 {
-					break outer
-				}
-
-				r.Body += string(currentData[:remaining])
-				read += remaining
-
-				if len(r.Body) == length {
-					r.state = StateDone
-				}
-
-			case StateInit:
-				rl, n, err := parseRequestLine(currentData)
-				if err != nil {
-					r.state = StateError
-					return 0, err
-				}
-
-				if n == 0 {
-					break outer
-				}
-
-				r.RequestLine = *rl
-				read += n
-
-				r.state = StateHeaders
-			case StateDone:
+			if n == 0 {
 				break outer
+			}
+
+			read += n
+
+			if done {
+				r.state = StateBody
+			}
+
+		case StateBody:
+			// If we have a Content-Length header, parse the body
+			length := getInt(r.Headers, "Content-Length", 0)
+			if length == 0 {
+				r.state = StateDone
+				break
+			}
+			remaining := min(length-len(r.Body), len(currentData))
+			if remaining == 0 {
+				break outer
+			}
+
+			r.Body += string(currentData[:remaining])
+			read += remaining
+
+			if len(r.Body) == length {
+				r.state = StateDone
+			}
+
+		case StateInit:
+			rl, n, err := parseRequestLine(currentData)
+			if err != nil {
+				r.state = StateError
+				return 0, err
+			}
+
+			if n == 0 {
+				break outer
+			}
+
+			r.RequestLine = *rl
+			read += n
+
+			r.state = StateHeaders
+		case StateDone:
+			break outer
 		}
 	}
 
@@ -176,7 +175,7 @@ func (r *Request) done() bool {
 }
 
 func RequestFromReader(reader io.Reader) (*Request, error) {
-	request := newRequest();
+	request := newRequest()
 	// NOTE: buffer could get overrun
 	buf := make([]byte, 1024)
 	bufLen := 0
@@ -200,7 +199,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	}
 
 	if !request.done() {
-		return nil, ERROR_INVALID_DATA_SIZE
+		return nil, fmt.Errorf("EOF")
 	}
 
 	return request, nil

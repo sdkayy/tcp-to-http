@@ -93,7 +93,6 @@ func TestRequestLineParse(t *testing.T) {
 	assert.Equal(t, "1.1", r.RequestLine.HttpVersion)
 }
 
-
 func TestParseHeaders(t *testing.T) {
 	// Test: Standard Headers
 	reader := &chunkReader{
@@ -116,12 +115,11 @@ func TestParseHeaders(t *testing.T) {
 	require.Error(t, err)
 }
 
-
 func TestParseBody(t *testing.T) {
 	slog.Info("Testing body parsing")
 	// Test: Standard Body
 	reader := &chunkReader{
-		data: "POST /submit HTTP/1.1\r\nHost: localhost:42069\r\nContent-Length: 13\r\n\r\nhello world!\n",
+		data:            "POST /submit HTTP/1.1\r\nHost: localhost:42069\r\nContent-Length: 13\r\n\r\nhello world!\n",
 		numBytesPerRead: 3,
 	}
 	r, err := RequestFromReader(reader)
